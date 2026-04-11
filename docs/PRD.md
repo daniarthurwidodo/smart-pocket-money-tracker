@@ -221,9 +221,8 @@ The following are explicitly **out of scope** for this version:
 | id | SERIAL | Auto | - | Primary Key |
 | name | VARCHAR(100) | Yes | - | Max 100 chars |
 | balance | DECIMAL(12,2) | Yes | 0.00 | >= 0 |
-| currency | VARCHAR(3) | Yes | USD | ISO 4217 format |
+| currency | VARCHAR(3) | Yes | IDR | ISO 4217 format |
 | description | TEXT | No | NULL | - |
-| date | DATE | Yes | CURRENT_DATE | - |
 | is_active | BOOLEAN | Yes | true | - |
 | created_at | TIMESTAMP | Auto | NOW() | Timezone aware |
 | updated_at | TIMESTAMP | Auto | NOW() | Timezone aware |
@@ -235,7 +234,6 @@ The following are explicitly **out of scope** for this version:
 | name | Required, 1-100 chars | "Name is required" / "Name must not exceed 100 characters" |
 | balance | Non-negative number | "Balance must be a non-negative number" |
 | currency | 3-letter uppercase | "Currency must be a 3-letter ISO code" |
-| date | Valid ISO date format | "Date must be a valid date" |
 
 ### 4.3 Data Retention
 
@@ -298,7 +296,7 @@ The following are explicitly **out of scope** for this version:
 | Database | Neon PostgreSQL | 17 |
 | ORM/Driver | pg (node-postgres) | Latest |
 | AI Provider | OpenRouter | API |
-| AI Model | Qwen 3.5 Flash | - |
+| AI Model | Qwen/Qwen3.5-Flash-02-23 | - |
 | Styling | Tailwind CSS | 4.x |
 
 ### 5.3 API Response Format

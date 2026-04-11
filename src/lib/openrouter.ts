@@ -22,6 +22,8 @@ interface OpenRouterResponse {
   };
 }
 
+const OPENROUTER_TIMEOUT_MS = 15000; // 15 seconds timeout
+
 export class OpenRouterClient {
   private readonly baseUrl = 'https://openrouter.ai/api/v1';
   private readonly apiKey: string;
@@ -44,9 +46,8 @@ export class OpenRouterClient {
   "pocket": {
     "name": string (required for create/update),
     "balance": number (optional, defaults to 0),
-    "currency": string (optional, defaults to "USD", must be 3-letter ISO code),
+    "currency": string (optional, defaults to "IDR", must be 3-letter ISO code),
     "description": string (optional),
-    "date": string in ISO format YYYY-MM-DD (optional, defaults to today),
     "isActive": boolean (optional, defaults to true)
   },
   "id": number (required only for update/delete actions)
@@ -56,8 +57,12 @@ If the user's request doesn't contain enough information to create a pocket (mis
 Only return the JSON object, no other text.`;
 
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), OPENROUTER_TIMEOUT_MS);
+
       const response = await fetch(`${this.baseUrl}/chat/completions`, {
         method: 'POST',
+        signal: controller.signal,
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${this.apiKey}`,
@@ -65,20 +70,27 @@ Only return the JSON object, no other text.`;
           'X-Title': 'Smart Pocket Money Tracker',
         },
         body: JSON.stringify({
-          model: 'qwen/qwen-3.5-flash',
+          model: 'qwen/qwen3.5-flash-02-23',
           messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userPrompt },
           ],
           response_format: { type: 'json_object' },
-          max_tokens: 500,
+          max_tokens: 300,
           temperature: 0.1,
         } as OpenRouterRequest),
       });
 
+      clearTimeout(timeoutId);
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         console.error('OpenRouter API error:', response.status, errorData);
+
+        if (response.status === 408 || response.status === 429) {
+          throw new Error('OpenRouter API timeout or rate limit exceeded');
+        }
+
         throw new Error(`OpenRouter API error: ${response.status}`);
       }
 
@@ -110,7 +122,6 @@ export interface PocketData {
     balance?: number;
     currency?: string;
     description?: string;
-    date?: string;
     isActive?: boolean;
   };
   id?: number;

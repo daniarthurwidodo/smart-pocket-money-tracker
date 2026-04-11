@@ -74,7 +74,7 @@ CREATE TABLE pockets (
 ### AI Endpoint
 - `POST /api/pocket/prompt` - Natural language processing
   - Body: `{ "prompt": "string" }`
-  - Model: `qwen/qwen-3.5-flash`
+  - Model: `qwen/qwen3.5-flash-02-23`
   - Actions: create, update, delete, list
 
 ### Health

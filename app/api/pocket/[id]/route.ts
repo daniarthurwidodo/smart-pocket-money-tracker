@@ -55,7 +55,6 @@ export async function PUT(
       balance: body.balance,
       currency: body.currency,
       description: body.description,
-      date: body.date,
       isActive: body.isActive,
     };
 

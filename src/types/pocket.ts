@@ -4,7 +4,6 @@ export interface Pocket {
   balance: number;
   currency: string;
   description: string | null;
-  date: Date;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -15,7 +14,6 @@ export interface CreatePocketInput {
   balance?: number;
   currency?: string;
   description?: string;
-  date?: string | Date;
   isActive?: boolean;
 }
 
@@ -24,7 +22,6 @@ export interface UpdatePocketInput {
   balance?: number;
   currency?: string;
   description?: string;
-  date?: string | Date;
   isActive?: boolean;
 }
 

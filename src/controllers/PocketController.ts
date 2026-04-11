@@ -13,7 +13,6 @@ interface RequestBody {
   currency?: string;
   description?: string;
   isActive?: boolean;
-  date?: string;
 }
 
 export class PocketController {
@@ -165,13 +164,6 @@ export class PocketController {
       errors.push('Currency must be a 3-letter ISO code');
     }
 
-    if (input.date) {
-      const dateObj = new Date(input.date);
-      if (isNaN(dateObj.getTime())) {
-        errors.push('Date must be a valid date');
-      }
-    }
-
     return errors;
   }
 
@@ -192,13 +184,6 @@ export class PocketController {
 
     if (input.currency && !/^[A-Z]{3}$/.test(input.currency)) {
       errors.push('Currency must be a 3-letter ISO code');
-    }
-
-    if (input.date) {
-      const dateObj = new Date(input.date);
-      if (isNaN(dateObj.getTime())) {
-        errors.push('Date must be a valid date');
-      }
     }
 
     return errors;

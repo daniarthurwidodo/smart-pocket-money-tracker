@@ -45,7 +45,6 @@ components:
         - balance
         - currency
         - isActive
-        - date
         - createdAt
         - updatedAt
       properties:
@@ -63,22 +62,17 @@ components:
           type: number
           format: decimal
           description: Current balance in the pocket
-          example: 500.00
+          example: 500000
         currency:
           type: string
           pattern: '^[A-Z]{3}$'
           description: ISO 4217 3-letter currency code
-          example: USD
+          example: IDR
         description:
           type: string
           nullable: true
           description: Optional description of the pocket purpose
           example: Monthly grocery budget
-        date:
-          type: string
-          format: date
-          description: Date associated with the pocket entry
-          example: 2026-04-11
         isActive:
           type: boolean
           description: Whether the pocket is currently active
@@ -109,21 +103,16 @@ components:
           format: decimal
           minimum: 0
           description: Initial balance (defaults to 0)
-          example: 500.00
+          example: 500000
         currency:
           type: string
           pattern: '^[A-Z]{3}$'
-          description: Currency code (defaults to USD)
-          example: USD
+          description: Currency code (defaults to IDR)
+          example: IDR
         description:
           type: string
           description: Optional description
           example: Monthly grocery budget
-        date:
-          type: string
-          format: date
-          description: Date for the pocket entry (defaults to today)
-          example: 2026-04-11
         isActive:
           type: boolean
           description: Active status (defaults to true)
@@ -142,22 +131,17 @@ components:
           format: decimal
           minimum: 0
           description: Updated balance
-          example: 750.00
+          example: 750000
         currency:
           type: string
           pattern: '^[A-Z]{3}$'
           description: Updated currency code
-          example: USD
+          example: IDR
         description:
           type: string
           nullable: true
           description: Updated description
           example: Updated grocery budget
-        date:
-          type: string
-          format: date
-          description: Updated date
-          example: 2026-04-15
         isActive:
           type: boolean
           description: Updated active status

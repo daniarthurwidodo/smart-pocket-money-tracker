@@ -38,7 +38,6 @@ export async function POST(request: NextRequest) {
       balance: body.balance,
       currency: body.currency,
       description: body.description,
-      date: body.date,
       isActive: body.isActive,
     };
 

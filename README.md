@@ -16,7 +16,7 @@ A Next.js application for managing pocket money budgets with AI-powered natural 
 - **Database**: Neon Serverless PostgreSQL
 - **Language**: TypeScript
 - **Styling**: Tailwind CSS v4
-- **AI Integration**: OpenRouter API (Qwen 3.5 Flash)
+- **AI Integration**: OpenRouter API (Qwen/Qwen3.5-Flash-02-23)
 
 ## Getting Started
 
@@ -109,9 +109,8 @@ The `pockets` table has the following columns:
 | `id` | SERIAL | Primary key |
 | `name` | VARCHAR(100) | Pocket name |
 | `balance` | DECIMAL(12,2) | Current balance |
-| `currency` | VARCHAR(3) | ISO currency code (USD, EUR, etc.) |
+| `currency` | VARCHAR(3) | ISO currency code (IDR, USD, etc.) |
 | `description` | TEXT | Optional description |
-| `date` | DATE | Associated date |
 | `is_active` | BOOLEAN | Active status |
 | `created_at` | TIMESTAMP | Creation timestamp |
 | `updated_at` | TIMESTAMP | Last update timestamp |

@@ -31,6 +31,11 @@ export async function POST(request: NextRequest) {
       parsedData = await openRouterClient.parsePocketPrompt(prompt);
     } catch (openRouterError) {
       console.error('OpenRouter API error:', openRouterError);
+
+      if (openRouterError instanceof Error && openRouterError.name === 'AbortError') {
+        return errorResponse('AI request timed out. Please try again.', { status: 504 });
+      }
+
       return errorResponse('Failed to process prompt with AI', { status: 502 });
     }
 
@@ -55,7 +60,6 @@ export async function POST(request: NextRequest) {
           balance: parsedData.pocket.balance,
           currency: parsedData.pocket.currency,
           description: parsedData.pocket.description,
-          date: parsedData.pocket.date,
           isActive: parsedData.pocket.isActive,
         });
 

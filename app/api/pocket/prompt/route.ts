@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { OpenRouterClient, PocketData } from '../../../../src/lib/openrouter';
+import { OpenRouterClient, PocketData, ParsePocketPromptResult } from '../../../../src/lib/openrouter';
 import { PocketController } from '../../../../src/controllers/PocketController';
 import {
   successResponse,
@@ -45,11 +45,11 @@ export async function POST(request: NextRequest) {
 
     console.log(`[PromptAPI:${requestId}] Processing prompt: "${promptValue.substring(0, 100)}${promptValue.length > 100 ? '...' : ''}"`);
 
-    let parsedData: PocketData | null;
+    let parseResult: ParsePocketPromptResult;
 
     try {
-      parsedData = await openRouterClient.parsePocketPrompt(promptValue);
-      console.log(`[PromptAPI:${requestId}] OpenRouter response:`, JSON.stringify(parsedData));
+      parseResult = await openRouterClient.parsePocketPrompt(promptValue);
+      console.log(`[PromptAPI:${requestId}] OpenRouter response:`, JSON.stringify(parseResult.parsedData));
     } catch (openRouterError) {
       const elapsed = Date.now() - startTime;
       console.error(`[PromptAPI:${requestId}] OpenRouter API error after ${elapsed}ms:`, {
@@ -66,15 +66,18 @@ export async function POST(request: NextRequest) {
       return errorResponse('Failed to process prompt with AI', { status: 502 });
     }
 
-    if (!parsedData) {
+    if (!parseResult.parsedData) {
       console.error(`[PromptAPI:${requestId}] OpenRouter returned null/undefined - could not parse prompt:`, {
         prompt: promptValue.substring(0, 200),
+        modelUsed: parseResult.modelUsed,
       });
       return errorResponse(
         'Could not understand your request. Please provide more details about the pocket you want to create.',
         { status: 400 }
       );
     }
+
+    const parsedData = parseResult.parsedData;
 
     let result;
     let actionMessage: string;
@@ -183,12 +186,20 @@ export async function POST(request: NextRequest) {
     console.log(`[PromptAPI:${requestId}] Success after ${elapsed}ms:`, {
       action: parsedData.action,
       message: actionMessage,
+      modelUsed: parseResult.modelUsed,
+      fallbackUsed: parseResult.fallbackUsed,
+      retryCount: parseResult.retryCount,
     });
 
     return successResponse(result.data, {
       message: actionMessage,
       total: 'total' in result ? result.total : undefined,
-      metadata: { action: parsedData.action },
+      metadata: {
+        action: parsedData.action,
+        modelUsed: parseResult.modelUsed,
+        fallbackUsed: parseResult.fallbackUsed,
+        retryCount: parseResult.retryCount,
+      },
     });
   }, 'API POST /pocket/prompt error');
 }

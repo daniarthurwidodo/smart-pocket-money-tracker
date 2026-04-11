@@ -92,8 +92,23 @@ CREATE TABLE pockets (
 ### AI Endpoint
 - `POST /api/pocket/prompt` - Natural language processing
   - Body: `{ "prompt": "string" }`
-  - Model: `nvidia/nemotron-3-super-120b-a12b:free`
+  - Model: `nvidia/nemotron-3-super-120b-a12b:free` (primary), `google/gemini-2.5-flash-lite` (fallback)
   - Actions: create, update, delete, list
+  
+**Response includes:**
+```json
+{
+  "success": true,
+  "data": { ... },
+  "message": "Pocket created successfully via AI",
+  "metadata": {
+    "action": "create",
+    "modelUsed": "nvidia/nemotron-3-super-120b-a12b:free",
+    "fallbackUsed": false,
+    "retryCount": 0
+  }
+}
+```
 
 ### Health
 - `GET /api/health` - Health check with DB status

@@ -44,7 +44,7 @@ export class OpenRouterClient {
     this.apiKey = apiKey;
   }
 
-  async parsePocketPrompt(userPrompt: string, retryCount: number = 0, useFallback: boolean = false): Promise<PocketData | null> {
+  async parsePocketPrompt(userPrompt: string, retryCount: number = 0, useFallback: boolean = false): Promise<ParsePocketPromptResult> {
     const systemPrompt = `Anda adalah asisten pelacak uang saku. Analisis permintaan pengguna dan ekstrak informasi pocket.
 
 **PENTING**:
@@ -138,23 +138,43 @@ export class OpenRouterClient {
       const content = data.choices?.[0]?.message?.content;
 
       if (!content) {
-        return null;
+        return {
+          parsedData: null,
+          modelUsed: modelToUse,
+          fallbackUsed: useFallback,
+          retryCount: retryCount,
+        };
       }
 
       const parsed = JSON.parse(content) as PocketData | null;
 
       if (!parsed || typeof parsed !== 'object') {
-        return null;
+        return {
+          parsedData: null,
+          modelUsed: modelToUse,
+          fallbackUsed: useFallback,
+          retryCount: retryCount,
+        };
       }
 
       // Validate that action is one of the valid values
       const validActions = ['create', 'update', 'delete', 'list'];
       if (!parsed.action || !validActions.includes(parsed.action)) {
         console.log(`Invalid or missing action in parsed response:`, parsed);
-        return null;
+        return {
+          parsedData: null,
+          modelUsed: modelToUse,
+          fallbackUsed: useFallback,
+          retryCount: retryCount,
+        };
       }
 
-      return parsed;
+      return {
+        parsedData: parsed,
+        modelUsed: modelToUse,
+        fallbackUsed: useFallback,
+        retryCount: retryCount,
+      };
     } catch (error) {
       const elapsed = Date.now() - startTime;
 
@@ -198,4 +218,11 @@ export interface PocketData {
     isActive?: boolean;
   };
   id?: number;
+}
+
+export interface ParsePocketPromptResult {
+  parsedData: PocketData | null;
+  modelUsed: string;
+  fallbackUsed: boolean;
+  retryCount: number;
 }

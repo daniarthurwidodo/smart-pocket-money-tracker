@@ -5,7 +5,9 @@ A Next.js application for managing pocket money budgets with AI-powered natural 
 ## Features
 
 - **CRUD Operations**: Create, read, update, and delete pocket budgets
-- **AI-Powered Prompts**: Use natural language to manage pockets (e.g., "Add a Savings pocket with $1000 for vacation")
+- **AI-Powered Prompts**: Use natural language to manage pockets (Bahasa Indonesia & English)
+- **Nameless Pockets**: Create savings pockets without a name - just specify amount and date
+- **Target Date Tracking**: Set target dates for savings goals (e.g., "2026-02-20")
 - **Multi-Currency Support**: Track budgets in any 3-letter ISO currency
 - **Active/Inactive Filtering**: Filter pockets by status
 - **Health Monitoring**: Built-in health check endpoint for monitoring
@@ -81,19 +83,42 @@ Open [http://localhost:3000](http://localhost:3000) to access the application.
 
 ## Request/Response Examples
 
-### Create Pocket
+### Create Pocket (with name)
 ```bash
 curl -X POST http://localhost:3000/api/pocket \
   -H "Content-Type: application/json" \
-  -d '{"name":"Groceries","balance":500,"currency":"USD","description":"Monthly budget"}'
+  -d '{"name":"Groceries","balance":500000,"currency":"IDR","description":"Monthly budget"}'
 ```
 
-### AI Prompt
+### Create Pocket (without name, with target date)
+```bash
+curl -X POST http://localhost:3000/api/pocket \
+  -H "Content-Type: application/json" \
+  -d '{"balance":5000,"targetDate":"2026-02-20","description":"Tabungan liburan"}'
+```
+
+### AI Prompt (English)
 ```bash
 curl -X POST http://localhost:3000/api/pocket/prompt \
   -H "Content-Type: application/json" \
   -d '{"prompt":"Add a pocket called Entertainment with $200 for movies"}'
 ```
+
+### AI Prompt (Bahasa Indonesia - with target date)
+```bash
+curl -X POST http://localhost:3000/api/pocket/prompt \
+  -H "Content-Type: application/json" \
+  -d '{"prompt":"Saya ingin menyimpan 5000 tanggal 20 februari 2026"}'
+```
+
+**Example AI responses:**
+| Prompt | Action |
+|--------|--------|
+| "Buat pocket Hiburan dengan 200 ribu" | Creates pocket with name "Hiburan", balance 200000 |
+| "Saya ingin menyimpan 5000 tanggal 20 februari 2026" | Creates pocket with balance 5000, targetDate "2026-02-20" (no name) |
+| "Update pocket 5 jadi 500 ribu" | Updates pocket ID 5 with balance 500000 |
+| "Hapus pocket 3" | Deletes pocket ID 3 |
+| "Tampilkan semua pocket" | Lists all pockets |
 
 ### Health Check
 ```bash
@@ -175,6 +200,39 @@ You can view it using tools like:
 |----------|-------------|----------|
 | `DATABASE_URL` | Neon PostgreSQL connection string | Yes |
 | `OPENROUTER_API_KEY` | OpenRouter API key for AI features | Yes (for prompt endpoint) |
+
+## AI Prompt Examples
+
+The AI endpoint supports natural language commands in Bahasa Indonesia and English.
+
+### Creating Pockets
+
+| Prompt | Result |
+|--------|--------|
+| "Buat pocket Tabungan dengan 50000" | Creates pocket with name "Tabungan", balance 50000 |
+| "Saya ingin menyimpan 10000 tanggal 20 februari 2026" | Creates pocket with balance 10000, targetDate "2026-02-20" |
+| "Add a pocket called Vacation with $500" | Creates pocket with name "Vacation", balance 500 |
+
+### Updating Pockets
+
+| Prompt | Result |
+|--------|--------|
+| "Update pocket 5 jadi 500 ribu" | Updates pocket ID 5 with balance 500000 |
+| "Change pocket 3 name to Entertainment" | Updates pocket ID 3 name to "Entertainment" |
+
+### Deleting Pockets
+
+| Prompt | Result |
+|--------|--------|
+| "Hapus pocket 3" | Deletes pocket ID 3 |
+| "Delete pocket 7" | Deletes pocket ID 7 |
+
+### Listing Pockets
+
+| Prompt | Result |
+|--------|--------|
+| "Tampilkan semua pocket" | Lists all pockets |
+| "Show only active pockets" | Lists active pockets only |
 
 ## Debugging and Logging
 

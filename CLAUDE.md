@@ -1,5 +1,19 @@
 # Smart Pocket Money Tracker - Project Guide
 
+## Constitution
+
+### Core Principles
+- **Use reusable code** - OOP class-based architecture
+- **Add security** - Validate inputs, use parameterized queries, never expose internal errors
+- **Use defensive programming** - Expect failures, handle nulls, wrap async operations
+- **Use DRY (Don't Repeat Yourself)** - Extract common logic to `src/lib/`
+
+### Guardrails
+- **No ambiguity** - Ask for clarity when requirements are unclear
+- **No making tests** - Focus on implementation, not test files
+- **No magic numbers** - Use named constants for all values
+- **No magic strings** - Use constants for string literals (currency codes, actions, etc.)
+
 ## Project Overview
 
 A Next.js 16 application for managing pocket money budgets with:
@@ -92,7 +106,74 @@ CREATE TABLE pockets (
 - **DRY**: Reusable utilities in `src/lib/`
 - **Security**: Input validation, parameterized queries
 
+### Defensive Programming
+
+**1. Input Validation**
+- Validate ALL inputs at system boundaries (API routes, public methods)
+- Never trust external data (request body, query params, path params)
+- Use type guards for runtime type checking
+- Validate array lengths, string lengths, and numeric ranges
+
+**2. Null/Undefined Handling**
+- Use explicit null checks before accessing properties
+- Use optional chaining (`?.`) for nested property access
+- Use nullish coalescing (`??`) for default values
+- Return early for null/invalid inputs
+
+**3. Error Handling**
+- Wrap async operations in try-catch blocks
+- Use `withErrorHandler()` for consistent API error handling
+- Log errors with context (request ID, input data, timing)
+- Never expose stack traces or internal errors to clients
+- Use specific error types for different failure scenarios
+
+**4. Database Safety**
+- Always use parameterized queries (never concatenate SQL)
+- Handle connection failures gracefully
+- Validate data before database operations
+- Check for null results from database queries
+
+**5. Type Safety**
+- Use TypeScript strict mode
+- Define explicit return types
+- Use interfaces for complex objects
+- Never use `any` - use `unknown` with type guards if needed
+
+**6. Security**
+- Validate and sanitize all user inputs
+- Use parameterized queries to prevent SQL injection
+- Validate API request bodies before processing
+- Log security-relevant events (validation failures, auth errors)
+
+**Example Pattern:**
+```typescript
+async function create(input: CreatePocketInput): Promise<Pocket> {
+  // 1. Validate input
+  const errors = this.validateInput(input);
+  if (errors.length > 0) {
+    return { success: false, error: errors.join(', ') };
+  }
+
+  // 2. Safe database operation with try-catch
+  try {
+    const pool = getPool();
+    const result = await pool.query(query, [input.name ?? null, input.balance ?? 0]);
+    
+    // 3. Check result
+    if (result.rows.length === 0) {
+      return { success: false, error: 'Failed to create' };
+    }
+    
+    return this.mapRowToPocket(result.rows[0]);
+  } catch (error) {
+    console.error('Create failed:', error);
+    throw error; // Let error handler wrap it
+  }
+}
+```
+
 ### Response Format
+
 All API responses use standardized format from `src/lib/api-response.ts`:
 
 **Success:**
@@ -114,10 +195,46 @@ All API responses use standardized format from `src/lib/api-response.ts`:
 }
 ```
 
+**Response Helper Functions:**
+| Function | Status | Use Case |
+|----------|--------|----------|
+| `successResponse(data)` | 200 | Standard success |
+| `successResponse(data, { status: 201 })` | 201 | Resource created |
+| `badRequestResponse('message')` | 400 | Invalid input |
+| `validationError({ field: ['error'] })` | 422 | Validation failed |
+| `notFoundResponse()` | 404 | Resource not found |
+| `unauthorizedResponse()` | 401 | Authentication required |
+| `serverErrorResponse()` | 500 | Internal error |
+| `errorResponse('msg', { status: 502 })` | Custom | Custom error |
+
 ### Error Handling
+
+**General Rules:**
 - Use `withErrorHandler()` wrapper for consistent error handling
 - Validate all inputs in controllers
 - Never expose internal errors to clients
+- Log errors with sufficient context for debugging
+
+**Error Response Patterns:**
+```typescript
+// Validation errors (400/422)
+return validationError({ field: ['error message'] });
+
+// Not found (404)
+return notFoundResponse('Resource not found');
+
+// Unauthorized (401)
+return unauthorizedResponse('Authentication required');
+
+// Server errors (500)
+return serverErrorResponse('Internal server error');
+```
+
+**Logging Best Practices:**
+- Include request ID for correlation
+- Log elapsed time for performance monitoring
+- Include input data (sanitized) for debugging
+- Use structured logging with consistent format
 
 ## Environment Variables
 

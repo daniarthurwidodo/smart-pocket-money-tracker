@@ -9,10 +9,11 @@ import {
 } from '../types/pocket';
 
 interface RequestBody {
-  name?: string;
+  name?: string | null;
   balance?: number;
   currency?: string;
-  description?: string;
+  description?: string | null;
+  targetDate?: string | null;
   isActive?: boolean;
 }
 
@@ -150,11 +151,7 @@ export class PocketController {
   private validateCreateInput(input: RequestBody): string[] {
     const errors: string[] = [];
 
-    if (!input.name || input.name.trim().length === 0) {
-      errors.push('Name is required');
-    }
-
-    if (input.name && input.name.length > 100) {
+    if (input.name !== undefined && input.name !== null && input.name.length > 100) {
       errors.push('Name must not exceed 100 characters');
     }
 
@@ -166,16 +163,21 @@ export class PocketController {
       errors.push('Currency must be a 3-letter ISO code');
     }
 
+    if (input.targetDate) {
+      const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+      if (!datePattern.test(input.targetDate)) {
+        errors.push('Target date must be in YYYY-MM-DD format');
+      }
+    }
+
     return errors;
   }
 
   private validateUpdateInput(input: RequestBody): string[] {
     const errors: string[] = [];
 
-    if (input.name !== undefined) {
-      if (input.name.trim().length === 0) {
-        errors.push('Name cannot be empty');
-      } else if (input.name.length > 100) {
+    if (input.name !== undefined && input.name !== null) {
+      if (input.name.length > 100) {
         errors.push('Name must not exceed 100 characters');
       }
     }
@@ -186,6 +188,13 @@ export class PocketController {
 
     if (input.currency && !/^[A-Z]{3}$/.test(input.currency)) {
       errors.push('Currency must be a 3-letter ISO code');
+    }
+
+    if (input.targetDate) {
+      const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+      if (!datePattern.test(input.targetDate)) {
+        errors.push('Target date must be in YYYY-MM-DD format');
+      }
     }
 
     return errors;

@@ -23,6 +23,12 @@ interface OpenRouterResponse {
 }
 
 const OPENROUTER_TIMEOUT_MS = 15000; // 15 seconds timeout
+const OPENROUTER_RETRY_DELAY_MS = 2000; // 2 seconds between retries
+const OPENROUTER_MAX_RETRIES = 2; // Retry up to 2 times for slow requests
+
+// Primary and fallback models
+const PRIMARY_MODEL = 'nvidia/nemotron-3-super-120b-a12b:free';
+const FALLBACK_MODEL = 'google/gemini-2.5-flash-lite';
 
 export class OpenRouterClient {
   private readonly baseUrl = 'https://openrouter.ai/api/v1';
@@ -38,28 +44,62 @@ export class OpenRouterClient {
     this.apiKey = apiKey;
   }
 
-  async parsePocketPrompt(userPrompt: string): Promise<PocketData | null> {
-    const systemPrompt = `You are a pocket money tracker assistant. Parse the user's request and extract pocket information. Return ONLY a valid JSON object with the following structure:
+  async parsePocketPrompt(userPrompt: string, retryCount: number = 0, useFallback: boolean = false): Promise<PocketData | null> {
+    const systemPrompt = `Anda adalah asisten pelacak uang saku. Analisis permintaan pengguna dan ekstrak informasi pocket.
 
+**PENTING**:
+- NAMA pocket TIDAK WAJIB (nullable). Pengguna tidak harus memberikan nama.
+- Jika pengguna ingin MENGUPDATE atau MENGHAPUS pocket, ID WAJIB diisi. Jika tidak ada ID, kembalikan null.
+- Ekstrak TANGGAL (target_date) jika pengguna menyebutkan tanggal spesifik.
+- Kembalikan HANYA JSON yang valid. Tanpa teks lain.
+
+**Actions yang valid**: "create", "update", "delete", "list"
+
+**Format respons untuk permintaan valid**:
 {
   "action": "create" | "update" | "delete" | "list",
   "pocket": {
-    "name": string (required for create/update),
-    "balance": number (optional, defaults to 0),
-    "currency": string (optional, defaults to "IDR", must be 3-letter ISO code),
-    "description": string (optional),
-    "isActive": boolean (optional, defaults to true)
+    "name": string (opsional, bisa null),
+    "balance": number (opsional, default 0),
+    "currency": string (opsional, default "IDR", harus 3 huruf kode ISO),
+    "description": string (opsional, untuk catatan tambahan),
+    "targetDate": string (opsional, format YYYY-MM-DD, jika pengguna menyebutkan tanggal),
+    "isActive": boolean (opsional, default true)
   },
-  "id": number (required only for update/delete actions)
+  "id": number (WAJIB untuk update/delete)
 }
 
-If the user's request doesn't contain enough information to create a pocket (missing name), return null.
-Only return the JSON object, no other text.`;
+**Catatan**:
+- Jika pengguna menyebutkan tanggal, ekstrak ke field "targetDate" dengan format YYYY-MM-DD
+- Contoh: "saya ingin menyimpan 5000 tanggal 20 februari 2026" -> targetDate: "2026-02-20"
+
+**Kapan mengembalikan null**:
+- Permintaan pengguna tidak jelas atau ambigu
+- Tidak ada ID pocket untuk update/delete
+- Pengguna hanya mengobrol atau bertanya hal di luar manajemen pocket
+
+**Contoh**:
+- "Saya ingin menyimpan 5000 tanggal 20 februari 2026" -> {"action": "create", "pocket": {"balance": 5000, "targetDate": "2026-02-20"}}
+- "Buat pocket Tabungan dengan 5000 untuk tanggal 20 februari 2026" -> {"action": "create", "pocket": {"name": "Tabungan", "balance": 5000, "targetDate": "2026-02-20"}}
+- "Buat pocket Hiburan dengan 200 ribu" -> {"action": "create", "pocket": {"name": "Hiburan", "balance": 200000}}
+- "Update pocket 5 jadi 500 ribu" -> {"action": "update", "id": 5, "pocket": {"balance": 500000}}
+- "Hapus pocket 3" -> {"action": "delete", "id": 3}
+- "Tampilkan semua pocket" -> {"action": "list"}
+- "Halo, apa kabar?" -> null (tidak relevan)
+
+**Tips**:
+- Nama pocket opsional - jika pengguna tidak menyebutkan nama, biarkan null atau tidak ada
+- Fokus pada jumlah (balance) dan tanggal (targetDate) yang disebutkan
+- Dukung semua bahasa termasuk Bahasa Indonesia dan English.`;
+
+    const startTime = Date.now();
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), OPENROUTER_TIMEOUT_MS);
+
+    // Determine which model to use
+    const modelToUse = useFallback ? FALLBACK_MODEL : PRIMARY_MODEL;
 
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), OPENROUTER_TIMEOUT_MS);
-
       const response = await fetch(`${this.baseUrl}/chat/completions`, {
         method: 'POST',
         signal: controller.signal,
@@ -70,7 +110,7 @@ Only return the JSON object, no other text.`;
           'X-Title': 'Smart Pocket Money Tracker',
         },
         body: JSON.stringify({
-          model: 'qwen/qwen3.5-flash-02-23',
+          model: modelToUse,
           messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userPrompt },
@@ -107,10 +147,42 @@ Only return the JSON object, no other text.`;
         return null;
       }
 
+      // Validate that action is one of the valid values
+      const validActions = ['create', 'update', 'delete', 'list'];
+      if (!parsed.action || !validActions.includes(parsed.action)) {
+        console.log(`Invalid or missing action in parsed response:`, parsed);
+        return null;
+      }
+
       return parsed;
     } catch (error) {
-      console.error('OpenRouterClient.parsePocketPrompt error:', error);
-      throw error;
+      const elapsed = Date.now() - startTime;
+
+      // If using fallback model, don't retry - just throw the error
+      if (useFallback) {
+        console.error(
+          `OpenRouter fallback model (${FALLBACK_MODEL}) also failed after ${elapsed}ms. No more retries.`
+        );
+        throw error;
+      }
+
+      // Retry logic for primary model
+      if (retryCount < OPENROUTER_MAX_RETRIES) {
+        console.log(
+          `OpenRouter request with ${PRIMARY_MODEL} took ${elapsed}ms or failed, retrying (${retryCount + 1}/${OPENROUTER_MAX_RETRIES})...`
+        );
+
+        // Wait before retrying
+        await new Promise(resolve => setTimeout(resolve, OPENROUTER_RETRY_DELAY_MS));
+
+        return this.parsePocketPrompt(userPrompt, retryCount + 1, false);
+      }
+
+      // Primary model exhausted retries, switch to fallback
+      console.log(
+        `OpenRouter primary model (${PRIMARY_MODEL}) failed after ${retryCount + 1} attempts, switching to fallback model (${FALLBACK_MODEL})...`
+      );
+      return this.parsePocketPrompt(userPrompt, 0, true);
     }
   }
 }
@@ -118,10 +190,11 @@ Only return the JSON object, no other text.`;
 export interface PocketData {
   action: 'create' | 'update' | 'delete' | 'list';
   pocket?: {
-    name: string;
+    name?: string | null;
     balance?: number;
     currency?: string;
-    description?: string;
+    description?: string | null;
+    targetDate?: string | null;
     isActive?: boolean;
   };
   id?: number;

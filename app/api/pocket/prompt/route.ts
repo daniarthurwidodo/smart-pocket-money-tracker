@@ -12,25 +12,52 @@ const openRouterClient = new OpenRouterClient();
 const pocketController = new PocketController();
 
 export async function POST(request: NextRequest) {
-  return withErrorHandler(async () => {
-    const body = await request.json();
+  const requestId = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+  const startTime = Date.now();
 
-    if (!body || typeof body !== 'object') {
+  return withErrorHandler(async () => {
+    let rawBody: unknown;
+    let promptValue: string | undefined;
+
+    try {
+      rawBody = await request.json();
+    } catch (parseError) {
+      console.error(`[PromptAPI:${requestId}] Failed to parse request body:`, parseError);
+      return badRequestResponse('Invalid JSON format');
+    }
+
+    if (!rawBody || typeof rawBody !== 'object') {
+      console.error(`[PromptAPI:${requestId}] Invalid request body type:`, typeof rawBody);
       return badRequestResponse('Request body must be a JSON object');
     }
 
-    const { prompt } = body;
+    const { prompt } = rawBody as { prompt?: unknown };
+    promptValue = prompt as string | undefined;
 
-    if (!prompt || typeof prompt !== 'string' || prompt.trim().length === 0) {
+    if (!promptValue || typeof promptValue !== 'string' || promptValue.trim().length === 0) {
+      console.error(`[PromptAPI:${requestId}] Validation failed - prompt:`, {
+        prompt: promptValue,
+        promptType: typeof promptValue,
+        promptLength: promptValue?.length,
+      });
       return badRequestResponse('Prompt is required and must be a non-empty string');
     }
+
+    console.log(`[PromptAPI:${requestId}] Processing prompt: "${promptValue.substring(0, 100)}${promptValue.length > 100 ? '...' : ''}"`);
 
     let parsedData: PocketData | null;
 
     try {
-      parsedData = await openRouterClient.parsePocketPrompt(prompt);
+      parsedData = await openRouterClient.parsePocketPrompt(promptValue);
+      console.log(`[PromptAPI:${requestId}] OpenRouter response:`, JSON.stringify(parsedData));
     } catch (openRouterError) {
-      console.error('OpenRouter API error:', openRouterError);
+      const elapsed = Date.now() - startTime;
+      console.error(`[PromptAPI:${requestId}] OpenRouter API error after ${elapsed}ms:`, {
+        error: openRouterError instanceof Error ? openRouterError.message : String(openRouterError),
+        errorName: openRouterError instanceof Error ? openRouterError.name : 'Unknown',
+        stack: openRouterError instanceof Error ? openRouterError.stack : undefined,
+        prompt: promptValue.substring(0, 200),
+      });
 
       if (openRouterError instanceof Error && openRouterError.name === 'AbortError') {
         return errorResponse('AI request timed out. Please try again.', { status: 504 });
@@ -40,6 +67,9 @@ export async function POST(request: NextRequest) {
     }
 
     if (!parsedData) {
+      console.error(`[PromptAPI:${requestId}] OpenRouter returned null/undefined - could not parse prompt:`, {
+        prompt: promptValue.substring(0, 200),
+      });
       return errorResponse(
         'Could not understand your request. Please provide more details about the pocket you want to create.',
         { status: 400 }
@@ -51,19 +81,21 @@ export async function POST(request: NextRequest) {
 
     switch (parsedData.action) {
       case 'create': {
-        if (!parsedData.pocket?.name) {
-          return badRequestResponse('Pocket name is required');
-        }
-
+        console.log(`[PromptAPI:${requestId}] Creating pocket:`, JSON.stringify(parsedData.pocket));
         result = await pocketController.create({
-          name: parsedData.pocket.name,
-          balance: parsedData.pocket.balance,
-          currency: parsedData.pocket.currency,
-          description: parsedData.pocket.description,
-          isActive: parsedData.pocket.isActive,
+          name: parsedData.pocket?.name ?? null,
+          balance: parsedData.pocket?.balance,
+          currency: parsedData.pocket?.currency,
+          description: parsedData.pocket?.description,
+          targetDate: parsedData.pocket?.targetDate,
+          isActive: parsedData.pocket?.isActive,
         });
 
         if (!result.success) {
+          console.error(`[PromptAPI:${requestId}] Create pocket failed:`, {
+            inputData: JSON.stringify(parsedData.pocket),
+            error: result.error,
+          });
           return errorResponse(result.error, { status: 400 });
         }
 
@@ -73,16 +105,31 @@ export async function POST(request: NextRequest) {
 
       case 'update': {
         if (!parsedData.id) {
+          console.error(`[PromptAPI:${requestId}] Update action missing ID:`, JSON.stringify(parsedData));
           return badRequestResponse('Pocket ID is required for update');
         }
 
         if (!parsedData.pocket) {
+          console.error(`[PromptAPI:${requestId}] Update action missing pocket data:`, JSON.stringify(parsedData));
           return badRequestResponse('No update data provided');
         }
 
-        result = await pocketController.update(parsedData.id, parsedData.pocket);
+        console.log(`[PromptAPI:${requestId}] Updating pocket ${parsedData.id}:`, JSON.stringify(parsedData.pocket));
+        result = await pocketController.update(parsedData.id, {
+          name: parsedData.pocket.name,
+          balance: parsedData.pocket.balance,
+          currency: parsedData.pocket.currency,
+          description: parsedData.pocket.description,
+          targetDate: parsedData.pocket.targetDate,
+          isActive: parsedData.pocket.isActive,
+        });
 
         if (!result.success) {
+          console.error(`[PromptAPI:${requestId}] Update pocket failed:`, {
+            id: parsedData.id,
+            inputData: JSON.stringify(parsedData.pocket),
+            error: result.error,
+          });
           return errorResponse(result.error, { status: 404 });
         }
 
@@ -92,12 +139,18 @@ export async function POST(request: NextRequest) {
 
       case 'delete': {
         if (!parsedData.id) {
+          console.error(`[PromptAPI:${requestId}] Delete action missing ID:`, JSON.stringify(parsedData));
           return badRequestResponse('Pocket ID is required for delete');
         }
 
+        console.log(`[PromptAPI:${requestId}] Deleting pocket ${parsedData.id}`);
         result = await pocketController.delete(parsedData.id);
 
         if (!result.success) {
+          console.error(`[PromptAPI:${requestId}] Delete pocket failed:`, {
+            id: parsedData.id,
+            error: result.error,
+          });
           return errorResponse(result.error, { status: 404 });
         }
 
@@ -110,20 +163,27 @@ export async function POST(request: NextRequest) {
           ? parsedData.pocket.isActive
           : undefined;
 
+        console.log(`[PromptAPI:${requestId}] Listing pockets (activeOnly: ${activeOnly})`);
         result = await pocketController.getAll(activeOnly);
 
         if (!result.success) {
+          console.error(`[PromptAPI:${requestId}] List pockets failed:`, {
+            activeOnly,
+            error: result.error,
+          });
           return errorResponse(result.error, { status: 500 });
         }
 
         actionMessage = 'Pockets retrieved successfully via AI';
         break;
       }
-
-      default: {
-        return badRequestResponse('Unknown action');
-      }
     }
+
+    const elapsed = Date.now() - startTime;
+    console.log(`[PromptAPI:${requestId}] Success after ${elapsed}ms:`, {
+      action: parsedData.action,
+      message: actionMessage,
+    });
 
     return successResponse(result.data, {
       message: actionMessage,

@@ -51,16 +51,20 @@ docs/
 ```sql
 CREATE TABLE pockets (
     id SERIAL PRIMARY KEY,
-    name VARCHAR(100) NOT NULL,
+    name VARCHAR(100) NULL,
     balance DECIMAL(12, 2) NOT NULL DEFAULT 0.00,
     currency VARCHAR(3) NOT NULL DEFAULT 'USD',
     description TEXT,
-    date DATE NOT NULL DEFAULT CURRENT_DATE,
+    target_date DATE,
     is_active BOOLEAN NOT NULL DEFAULT true,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 ```
+
+**Notes:**
+- `name` is nullable - pockets can be created without a name (savings-focused)
+- `target_date` stores the target/save date mentioned by users (e.g., "2026-02-20")
 
 ## API Endpoints
 
@@ -74,7 +78,7 @@ CREATE TABLE pockets (
 ### AI Endpoint
 - `POST /api/pocket/prompt` - Natural language processing
   - Body: `{ "prompt": "string" }`
-  - Model: `qwen/qwen3.5-flash-02-23`
+  - Model: `nvidia/nemotron-3-super-120b-a12b:free`
   - Actions: create, update, delete, list
 
 ### Health

@@ -16,7 +16,7 @@ A Next.js application for managing pocket money budgets with AI-powered natural 
 - **Database**: Neon Serverless PostgreSQL
 - **Language**: TypeScript
 - **Styling**: Tailwind CSS v4
-- **AI Integration**: OpenRouter API (Qwen/Qwen3.5-Flash-02-23)
+- **AI Integration**: OpenRouter API (NVIDIA/Nemotron-3-Super-120B-A12B:free)
 
 ## Getting Started
 
@@ -107,13 +107,18 @@ The `pockets` table has the following columns:
 | Column | Type | Description |
 |--------|------|-------------|
 | `id` | SERIAL | Primary key |
-| `name` | VARCHAR(100) | Pocket name |
+| `name` | VARCHAR(100) NULL | Pocket name (optional, can be null) |
 | `balance` | DECIMAL(12,2) | Current balance |
 | `currency` | VARCHAR(3) | ISO currency code (IDR, USD, etc.) |
 | `description` | TEXT | Optional description |
+| `target_date` | DATE | Target/save date (e.g., "2026-02-20") |
 | `is_active` | BOOLEAN | Active status |
 | `created_at` | TIMESTAMP | Creation timestamp |
 | `updated_at` | TIMESTAMP | Last update timestamp |
+
+**Notes:**
+- `name` is optional - pockets can be created without a name for savings-focused tracking
+- `target_date` stores the target date mentioned by users (e.g., "untuk tanggal 20 februari 2026")
 
 ## Project Structure
 
@@ -170,6 +175,60 @@ You can view it using tools like:
 |----------|-------------|----------|
 | `DATABASE_URL` | Neon PostgreSQL connection string | Yes |
 | `OPENROUTER_API_KEY` | OpenRouter API key for AI features | Yes (for prompt endpoint) |
+
+## Debugging and Logging
+
+### Error Logging Format
+
+The `/api/pocket/prompt` endpoint includes detailed error logging with request tracking:
+
+**Log format:** `[PromptAPI:{requestId}] {message}`
+
+Each error log includes:
+- **Request ID**: Unique identifier for correlation (format: `{timestamp}-{random}`)
+- **Timestamp**: Automatically included in request ID
+- **Elapsed time**: For performance monitoring
+- **Contextual data**: Prompt text, parsed results, validation errors
+
+**Example error scenarios logged:**
+- Invalid JSON body
+- Missing/empty prompt
+- OpenRouter API errors (with stack traces)
+- Validation failures
+- Action-specific errors (create/update/delete/list)
+
+### Retry Mechanism
+
+The OpenRouter AI client includes automatic retry with fallback model:
+
+| Setting | Value | Description |
+|---------|-------|-------------|
+| Timeout | 15s | Maximum time for each request attempt |
+| Max retries (primary) | 2 | Up to 2 retry attempts with primary model |
+| Retry delay | 2s | Wait time between retries |
+| Primary model | `nvidia/nemotron-3-super-120b-a12b:free` | NVIDIA Nemotron model |
+| Fallback model | `google/gemini-2.5-flash-lite` | Google Gemini (used if primary fails) |
+
+**Retry flow:**
+1. Request sent to primary model (NVIDIA Nemotron)
+2. If request fails or times out, retry up to 2 times
+3. If all primary model retries exhausted, switch to fallback (Google Gemini)
+4. If fallback fails, return error - no more retries
+
+**Log messages:**
+- `OpenRouter request with {model} took {elapsed}ms or failed, retrying ({retryCount}/{maxRetries})...`
+- `OpenRouter primary model ({primary}) failed after {n} attempts, switching to fallback model ({fallback})...`
+- `OpenRouter fallback model ({fallback}) also failed after {elapsed}ms. No more retries.`
+
+**Viewing logs:**
+```bash
+# Development (next.js dev server output)
+npm run dev
+
+# Production (check your hosting platform logs)
+# Vercel: vercel logs
+# Docker: docker logs <container-id>
+```
 
 ## License
 

@@ -7,16 +7,17 @@ export class PocketService {
   async create(input: CreatePocketInput): Promise<Pocket> {
     const pool = getPool();
     const query = `
-      INSERT INTO ${this.tableName} (name, balance, currency, description, is_active)
-      VALUES ($1, $2, $3, $4, $5)
+      INSERT INTO ${this.tableName} (name, balance, currency, description, target_date, is_active)
+      VALUES ($1, $2, $3, $4, $5, $6)
       RETURNING *
     `;
 
     const values = [
-      input.name,
+      input.name ?? null,
       input.balance ?? 0,
       input.currency ?? 'IDR',
       input.description ?? null,
+      input.targetDate ?? null,
       input.isActive ?? true,
     ];
 
@@ -79,6 +80,11 @@ export class PocketService {
       values.push(input.description);
     }
 
+    if (input.targetDate !== undefined) {
+      updates.push(`target_date = $${paramIndex++}`);
+      values.push(input.targetDate);
+    }
+
     if (input.isActive !== undefined) {
       updates.push(`is_active = $${paramIndex++}`);
       values.push(input.isActive);
@@ -118,10 +124,11 @@ export class PocketService {
   private mapRowToPocket(row: Record<string, unknown>): Pocket {
     return {
       id: row.id as number,
-      name: row.name as string,
+      name: row.name as string | null,
       balance: Number(row.balance as number | string),
       currency: row.currency as string,
       description: row.description as string | null,
+      targetDate: row.target_date as string | null,
       isActive: row.is_active as boolean,
       createdAt: row.created_at as Date,
       updatedAt: row.updated_at as Date,

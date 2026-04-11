@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__Neon__describe_branch",
+      "mcp__Neon__describe_project",
+      "mcp__Neon__describe_table_schema",
+      "mcp__Neon__prepare_database_migration",
+      "mcp__Neon__complete_database_migration"
+    ]
+  }
+}

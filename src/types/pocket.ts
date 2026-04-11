@@ -1,27 +1,30 @@
 export interface Pocket {
   id: number;
-  name: string;
+  name: string | null;
   balance: number;
   currency: string;
   description: string | null;
+  targetDate: string | null;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
 
 export interface CreatePocketInput {
-  name: string;
+  name?: string | null;
   balance?: number;
   currency?: string;
-  description?: string;
+  description?: string | null;
+  targetDate?: string | null;
   isActive?: boolean;
 }
 
 export interface UpdatePocketInput {
-  name?: string;
+  name?: string | null;
   balance?: number;
   currency?: string;
-  description?: string;
+  description?: string | null;
+  targetDate?: string | null;
   isActive?: boolean;
 }
 

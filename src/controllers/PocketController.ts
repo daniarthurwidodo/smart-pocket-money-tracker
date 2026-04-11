@@ -2,7 +2,6 @@ import { PocketService } from '../services/PocketService';
 import {
   ApiResponse,
   ApiListResponse,
-  ApiSuccessResponse,
   CreatePocketInput,
   UpdatePocketInput,
   Pocket,
@@ -15,10 +14,6 @@ interface RequestBody {
   description?: string;
   isActive?: boolean;
   date?: string;
-}
-
-interface Params {
-  params: Promise<{ id: string }>;
 }
 
 export class PocketController {

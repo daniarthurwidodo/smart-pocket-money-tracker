@@ -1,5 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { PocketController } from '../../../../src/controllers/PocketController';
+import {
+  successResponse,
+  withErrorHandler,
+  badRequestResponse,
+  notFoundResponse,
+} from '../../../../src/lib/api-response';
 import { UpdatePocketInput } from '../../../../src/types/pocket';
 
 const controller = new PocketController();
@@ -8,49 +14,42 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  try {
+  return withErrorHandler(async () => {
     const { id } = await params;
     const parsedId = parseInt(id, 10);
 
     if (isNaN(parsedId)) {
-      return NextResponse.json(
-        { success: false, error: 'Invalid pocket ID' },
-        { status: 400 }
-      );
+      return badRequestResponse('Invalid pocket ID');
     }
 
     const result = await controller.getById(parsedId);
 
     if (!result.success) {
-      return NextResponse.json(result, { status: 404 });
+      return notFoundResponse(result.error);
     }
 
-    return NextResponse.json(result);
-  } catch (error) {
-    console.error('API GET /pocket/:id error:', error);
-    return NextResponse.json(
-      { success: false, error: 'Internal server error' },
-      { status: 500 }
-    );
-  }
+    return successResponse(result.data);
+  }, 'API GET /pocket/:id error');
 }
 
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  try {
+  return withErrorHandler(async () => {
     const { id } = await params;
     const parsedId = parseInt(id, 10);
 
     if (isNaN(parsedId)) {
-      return NextResponse.json(
-        { success: false, error: 'Invalid pocket ID' },
-        { status: 400 }
-      );
+      return badRequestResponse('Invalid pocket ID');
     }
 
     const body = await request.json();
+
+    if (!body || typeof body !== 'object') {
+      return badRequestResponse('Request body must be a JSON object');
+    }
+
     const input: UpdatePocketInput = {
       name: body.name,
       balance: body.balance,
@@ -63,46 +62,35 @@ export async function PUT(
     const result = await controller.update(parsedId, input);
 
     if (!result.success) {
-      return NextResponse.json(result, { status: 404 });
+      return notFoundResponse(result.error);
     }
 
-    return NextResponse.json(result);
-  } catch (error) {
-    console.error('API PUT /pocket/:id error:', error);
-    return NextResponse.json(
-      { success: false, error: 'Internal server error' },
-      { status: 500 }
-    );
-  }
+    return successResponse(result.data, {
+      message: 'Pocket updated successfully',
+    });
+  }, 'API PUT /pocket/:id error');
 }
 
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  try {
+  return withErrorHandler(async () => {
     const { id } = await params;
     const parsedId = parseInt(id, 10);
 
     if (isNaN(parsedId)) {
-      return NextResponse.json(
-        { success: false, error: 'Invalid pocket ID' },
-        { status: 400 }
-      );
+      return badRequestResponse('Invalid pocket ID');
     }
 
     const result = await controller.delete(parsedId);
 
     if (!result.success) {
-      return NextResponse.json(result, { status: 404 });
+      return notFoundResponse(result.error);
     }
 
-    return NextResponse.json(result, { status: 204 });
-  } catch (error) {
-    console.error('API DELETE /pocket/:id error:', error);
-    return NextResponse.json(
-      { success: false, error: 'Internal server error' },
-      { status: 500 }
-    );
-  }
+    return successResponse(null, {
+      message: 'Pocket deleted successfully',
+    });
+  }, 'API DELETE /pocket/:id error');
 }

@@ -1,33 +1,38 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { PocketController } from '../../../src/controllers/PocketController';
+import {
+  successResponse,
+  errorResponse,
+  withErrorHandler,
+  badRequestResponse,
+} from '../../../src/lib/api-response';
 import { CreatePocketInput } from '../../../src/types/pocket';
 
 const controller = new PocketController();
 
 export async function GET(request: NextRequest) {
-  try {
+  return withErrorHandler(async () => {
     const searchParams = request.nextUrl.searchParams;
     const activeOnly = searchParams.get('active') === 'true';
 
     const result = await controller.getAll(activeOnly);
 
     if (!result.success) {
-      return NextResponse.json(result, { status: 500 });
+      return errorResponse(result.error, { status: 500 });
     }
 
-    return NextResponse.json(result);
-  } catch (error) {
-    console.error('API GET /pocket error:', error);
-    return NextResponse.json(
-      { success: false, error: 'Internal server error' },
-      { status: 500 }
-    );
-  }
+    return successResponse(result.data, { total: result.total });
+  }, 'API GET /pocket error');
 }
 
 export async function POST(request: NextRequest) {
-  try {
+  return withErrorHandler(async () => {
     const body = await request.json();
+
+    if (!body || typeof body !== 'object') {
+      return badRequestResponse('Request body must be a JSON object');
+    }
+
     const input: CreatePocketInput = {
       name: body.name,
       balance: body.balance,
@@ -40,15 +45,12 @@ export async function POST(request: NextRequest) {
     const result = await controller.create(input);
 
     if (!result.success) {
-      return NextResponse.json(result, { status: 400 });
+      return errorResponse(result.error, { status: 400 });
     }
 
-    return NextResponse.json(result, { status: 201 });
-  } catch (error) {
-    console.error('API POST /pocket error:', error);
-    return NextResponse.json(
-      { success: false, error: 'Internal server error' },
-      { status: 500 }
-    );
-  }
+    return successResponse(result.data, {
+      status: 201,
+      message: 'Pocket created successfully',
+    });
+  }, 'API POST /pocket error');
 }

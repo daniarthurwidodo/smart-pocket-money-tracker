@@ -65,7 +65,7 @@ Only return the JSON object, no other text.`;
           'X-Title': 'Smart Pocket Money Tracker',
         },
         body: JSON.stringify({
-          model: 'meta-llama/llama-3-8b-instruct:free',
+          model: 'qwen/qwen-3.5-flash',
           messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userPrompt },

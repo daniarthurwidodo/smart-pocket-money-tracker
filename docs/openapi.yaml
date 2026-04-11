@@ -1,0 +1,603 @@
+openapi: 3.0.3
+info:
+  title: Smart Pocket Money Tracker API
+  description: |
+    RESTful API for managing pocket money budgets with AI-powered natural language processing.
+
+    ## Features
+    - CRUD operations for pocket budgets
+    - AI-powered natural language prompt processing
+    - Multi-currency support
+    - Active/inactive pocket filtering
+  version: 1.0.0
+  contact:
+    name: Smart Pocket Money Tracker
+  license:
+    name: MIT
+
+servers:
+  - url: http://localhost:3000
+    description: Development server
+  - url: https://your-production-domain.com
+    description: Production server
+
+tags:
+  - name: Pockets
+    description: Pocket budget management endpoints
+  - name: AI
+    description: AI-powered natural language processing endpoints
+  - name: Health
+    description: Health check and monitoring endpoints
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+
+  schemas:
+    Pocket:
+      type: object
+      required:
+        - id
+        - name
+        - balance
+        - currency
+        - isActive
+        - date
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: integer
+          format: int32
+          description: Unique identifier for the pocket
+          example: 1
+        name:
+          type: string
+          maxLength: 100
+          description: Name of the pocket budget
+          example: Groceries
+        balance:
+          type: number
+          format: decimal
+          description: Current balance in the pocket
+          example: 500.00
+        currency:
+          type: string
+          pattern: '^[A-Z]{3}$'
+          description: ISO 4217 3-letter currency code
+          example: USD
+        description:
+          type: string
+          nullable: true
+          description: Optional description of the pocket purpose
+          example: Monthly grocery budget
+        date:
+          type: string
+          format: date
+          description: Date associated with the pocket entry
+          example: 2026-04-11
+        isActive:
+          type: boolean
+          description: Whether the pocket is currently active
+          example: true
+        createdAt:
+          type: string
+          format: date-time
+          description: Timestamp when the pocket was created
+          example: 2026-04-11T04:04:36.794Z
+        updatedAt:
+          type: string
+          format: date-time
+          description: Timestamp when the pocket was last updated
+          example: 2026-04-11T04:13:42.330Z
+
+    CreatePocketInput:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          maxLength: 100
+          description: Name of the pocket budget
+          example: Groceries
+        balance:
+          type: number
+          format: decimal
+          minimum: 0
+          description: Initial balance (defaults to 0)
+          example: 500.00
+        currency:
+          type: string
+          pattern: '^[A-Z]{3}$'
+          description: Currency code (defaults to USD)
+          example: USD
+        description:
+          type: string
+          description: Optional description
+          example: Monthly grocery budget
+        date:
+          type: string
+          format: date
+          description: Date for the pocket entry (defaults to today)
+          example: 2026-04-11
+        isActive:
+          type: boolean
+          description: Active status (defaults to true)
+          example: true
+
+    UpdatePocketInput:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 100
+          description: Updated name
+          example: Groceries 2026
+        balance:
+          type: number
+          format: decimal
+          minimum: 0
+          description: Updated balance
+          example: 750.00
+        currency:
+          type: string
+          pattern: '^[A-Z]{3}$'
+          description: Updated currency code
+          example: USD
+        description:
+          type: string
+          nullable: true
+          description: Updated description
+          example: Updated grocery budget
+        date:
+          type: string
+          format: date
+          description: Updated date
+          example: 2026-04-15
+        isActive:
+          type: boolean
+          description: Updated active status
+          example: false
+
+    SuccessResponse:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+        message:
+          type: string
+          description: Optional success message
+          example: Pocket created successfully
+        total:
+          type: integer
+          description: Total count (for list responses)
+          example: 5
+
+    ErrorResponse:
+      type: object
+      required:
+        - success
+        - error
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: string
+          description: Error message
+          example: Pocket not found
+        details:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+          description: Validation error details by field
+          example:
+            name:
+              - Name is required
+              - Name must not exceed 100 characters
+
+    PromptRequest:
+      type: object
+      required:
+        - prompt
+      properties:
+        prompt:
+          type: string
+          minLength: 1
+          description: |
+            Natural language description of the desired action.
+
+            Examples:
+            - "Create a pocket called Entertainment with 200 dollars"
+            - "Update pocket 1 to have balance of 500"
+            - "Delete pocket 3"
+            - "Show me all active pockets"
+          example: Add a pocket called Savings with $1000 for vacation on 2026-04-15
+
+paths:
+  /api/pocket:
+    get:
+      tags:
+        - Pockets
+      summary: List all pockets
+      description: Retrieve a list of all pockets. Optionally filter by active status.
+      operationId: getAllPockets
+      parameters:
+        - name: active
+          in: query
+          description: Filter to show only active pockets
+          required: false
+          schema:
+            type: boolean
+          example: true
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Pocket'
+                      total:
+                        type: integer
+                        example: 2
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    post:
+      tags:
+        - Pockets
+      summary: Create a new pocket
+      description: Create a new pocket budget with the provided details.
+      operationId: createPocket
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePocketInput'
+      responses:
+        '201':
+          description: Pocket created successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Pocket'
+                      message:
+                        type: string
+                        example: Pocket created successfully
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/pocket/{id}:
+    get:
+      tags:
+        - Pockets
+      summary: Get a pocket by ID
+      description: Retrieve a specific pocket by its ID.
+      operationId: getPocketById
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Pocket ID
+          schema:
+            type: integer
+            format: int32
+            example: 1
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Pocket'
+        '400':
+          description: Invalid ID format
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Pocket not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    put:
+      tags:
+        - Pockets
+      summary: Update a pocket
+      description: Update an existing pocket by ID.
+      operationId: updatePocket
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Pocket ID
+          schema:
+            type: integer
+            format: int32
+            example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePocketInput'
+      responses:
+        '200':
+          description: Pocket updated successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Pocket'
+                      message:
+                        type: string
+                        example: Pocket updated successfully
+        '400':
+          description: Invalid input or ID format
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Pocket not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      tags:
+        - Pockets
+      summary: Delete a pocket
+      description: Delete a pocket by ID.
+      operationId: deletePocket
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Pocket ID
+          schema:
+            type: integer
+            format: int32
+            example: 1
+      responses:
+        '200':
+          description: Pocket deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Pocket deleted successfully
+        '400':
+          description: Invalid ID format
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Pocket not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/pocket/prompt:
+    post:
+      tags:
+        - AI
+      summary: Process natural language prompt
+      description: |
+        Process a natural language prompt to perform pocket operations.
+
+        The AI will parse the prompt and automatically execute the appropriate action:
+        - Create a new pocket
+        - Update an existing pocket
+        - Delete a pocket
+        - List pockets
+
+        Supported actions are determined by the AI based on your request.
+      operationId: processPrompt
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PromptRequest'
+      responses:
+        '200':
+          description: Prompt processed successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        oneOf:
+                          - $ref: '#/components/schemas/Pocket'
+                          - type: array
+                            items:
+                              $ref: '#/components/schemas/Pocket'
+                      action:
+                        type: string
+                        enum: [create, update, delete, list]
+                        example: create
+                      message:
+                        type: string
+                        example: Pocket created successfully via AI
+        '400':
+          description: Invalid prompt or could not parse
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: AI service unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/health:
+    get:
+      tags:
+        - Health
+      summary: Health check
+      description: |
+        Check the health status of the API and its dependencies.
+
+        Returns the status of:
+        - API server uptime
+        - Database connectivity and response time
+      operationId: getHealth
+      responses:
+        '200':
+          description: API is healthy and all services are connected
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - status
+                  - timestamp
+                  - uptime
+                  - services
+                properties:
+                  status:
+                    type: string
+                    enum: [healthy, unhealthy]
+                    example: healthy
+                  timestamp:
+                    type: string
+                    format: date-time
+                    example: 2026-04-11T04:19:02.173Z
+                  uptime:
+                    type: number
+                    description: Server uptime in seconds
+                    example: 678.03
+                  services:
+                    type: object
+                    properties:
+                      database:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                            enum: [connected, disconnected]
+                            example: connected
+                          responseTimeMs:
+                            type: integer
+                            description: Database response time in milliseconds
+                            example: 50
+        '503':
+          description: Service unavailable - one or more dependencies are down
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: unhealthy
+                  timestamp:
+                    type: string
+                    format: date-time
+                  uptime:
+                    type: number
+                  services:
+                    type: object
+                    properties:
+                      database:
+                        type: object
+                        properties:
+                          status:
+                            type: string
+                            example: disconnected

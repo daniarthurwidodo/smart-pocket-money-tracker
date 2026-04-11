@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { OpenRouterClient, PocketData } from '../../../src/lib/openrouter';
-import { PocketController } from '../../../src/controllers/PocketController';
+import { OpenRouterClient, PocketData } from '../../../../src/lib/openrouter';
+import { PocketController } from '../../../../src/controllers/PocketController';
 
 const openRouterClient = new OpenRouterClient();
 const pocketController = new PocketController();

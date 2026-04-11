@@ -2,6 +2,7 @@ import { PocketService } from '../services/PocketService';
 import {
   ApiResponse,
   ApiListResponse,
+  ApiListSuccessResponse,
   CreatePocketInput,
   UpdatePocketInput,
   Pocket,
@@ -25,11 +26,12 @@ export class PocketController {
   async getAll(activeOnly?: boolean): Promise<ApiListResponse<Pocket>> {
     try {
       const pockets = await this.pocketService.getAll(activeOnly);
-      return {
+      const response: ApiListSuccessResponse<Pocket> = {
         success: true,
         data: pockets,
         total: pockets.length,
       };
+      return response;
     } catch (error) {
       console.error('PocketController.getAll error:', error);
       return {

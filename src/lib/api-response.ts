@@ -14,6 +14,7 @@ interface ApiErrorResponse {
 }
 
 export type ApiResponse<T> = ApiSuccessResponse<T> | ApiErrorResponse;
+export type ApiListResponse<T> = { success: true; data: T[]; total: number } | ApiErrorResponse;
 
 interface ErrorResponseOptions {
   status?: number;

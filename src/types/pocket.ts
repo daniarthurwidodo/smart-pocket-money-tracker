@@ -37,8 +37,10 @@ export interface ApiErrorResponse {
 
 export type ApiResponse<T> = ApiSuccessResponse<T> | ApiErrorResponse;
 
-export interface ApiListResponse<T> {
+export interface ApiListSuccessResponse<T> {
   success: true;
   data: T[];
   total: number;
 }
+
+export type ApiListResponse<T> = ApiListSuccessResponse<T> | ApiErrorResponse;

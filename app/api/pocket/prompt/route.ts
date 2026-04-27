@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { OpenRouterClient, PocketData, ParsePocketPromptResult } from '../../../../src/lib/openrouter';
 import { PocketController } from '../../../../src/controllers/PocketController';
+import { handleMITCreate } from '../../../../src/lib/mit-transaction';
 import {
   successResponse,
   errorResponse,
@@ -178,6 +179,39 @@ export async function POST(request: NextRequest) {
         }
 
         actionMessage = 'Pockets retrieved successfully via AI';
+        break;
+      }
+
+      case 'create_transaction': {
+        if (!parsedData.transaction) {
+          console.error(`[PromptAPI:${requestId}] create_transaction missing transaction data:`, JSON.stringify(parsedData));
+          return badRequestResponse('Transaction data is required');
+        }
+
+        const { pemasukan = 0, pengeluaran = 0, tanggal } = parsedData.transaction;
+
+        if (!tanggal) {
+          return badRequestResponse('tanggal (date) is required for transaction');
+        }
+
+        console.log(`[PromptAPI:${requestId}] Creating transaction:`, JSON.stringify(parsedData.transaction));
+
+        const transactionResult = await handleMITCreate({
+          pemasukan: String(pemasukan ?? 0),
+          pengeluaran: String(pengeluaran ?? 0),
+          tanggal,
+        });
+
+        if (!transactionResult.success) {
+          console.error(`[PromptAPI:${requestId}] Create transaction failed:`, {
+            inputData: JSON.stringify({ pemasukan, pengeluaran, tanggal }),
+            error: transactionResult.error,
+          });
+          return errorResponse(transactionResult.error, { status: 400 });
+        }
+
+        result = transactionResult;
+        actionMessage = 'Transaction created successfully via AI';
         break;
       }
     }

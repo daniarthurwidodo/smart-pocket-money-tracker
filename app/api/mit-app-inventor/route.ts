@@ -8,21 +8,17 @@ import {
   notFoundResponse,
 } from '../../../src/lib/api-response';
 import { CreateTransactionInput, UpdateTransactionInput } from '../../../src/types/transaction';
+import { handleMITCreate } from '../../../src/lib/mit-transaction';
 
 const controller = new MITAppInventorController();
 
-const VALID_ACTIONS = ['list', 'get', 'create', 'update', 'delete'] as const;
+const VALID_ACTIONS = ['list', 'get', 'create', 'update', 'delete', 'history'] as const;
 type Action = typeof VALID_ACTIONS[number];
 
 async function parseBody(request: NextRequest): Promise<Record<string, unknown> | null> {
-  const contentType = request.headers.get('content-type') ?? '';
   const rawBody = await request.text();
 
-  console.log('[MIT App Inventor] Content-Type:', contentType);
-  console.log('[MIT App Inventor] Raw body:', rawBody);
-
   if (!rawBody || rawBody.trim().length === 0) {
-    console.warn('[MIT App Inventor] Empty request body');
     return null;
   }
 
@@ -43,11 +39,8 @@ async function parseBody(request: NextRequest): Promise<Record<string, unknown> 
           result[key] = value;
         }
       }
-      console.log('[MIT App Inventor] Parsed form data:', result);
       return result;
     }
-
-    console.warn('[MIT App Inventor] Could not parse body in any format');
     return null;
   }
 }
@@ -57,6 +50,8 @@ async function handleRequest(request: NextRequest): Promise<NextResponse> {
   const action = (searchParams.get('action') ?? 'list') as Action;
   const resourceId = searchParams.get('id');
   const pocketId = searchParams.get('pocket_id');
+  const dateFrom = searchParams.get('date_from');
+  const dateTo = searchParams.get('date_to');
 
   if (!VALID_ACTIONS.includes(action)) {
     return badRequestResponse(`Invalid action. Must be one of: ${VALID_ACTIONS.join(', ')}`);
@@ -105,6 +100,19 @@ async function handleRequest(request: NextRequest): Promise<NextResponse> {
         return badRequestResponse('Request body must be a JSON object');
       }
 
+      // Handle MIT App Inventor format: { pengeluaran, pemasukan, tanggal }
+      const mitBody = body as Record<string, unknown>;
+      if ('pengeluaran' in mitBody || 'pemasukan' in mitBody || 'tanggal' in mitBody) {
+        const results = await handleMITCreate(body as Record<string, unknown>);
+        if (!results.success) {
+          return errorResponse(results.error, { status: 400 });
+        }
+        return successResponse(results.data, {
+          status: 201,
+          message: 'Transaction created successfully',
+        });
+      }
+
       const input: CreateTransactionInput = {
         pocketId: body.pocketId as number,
         amount: body.amount as number,
@@ -116,6 +124,7 @@ async function handleRequest(request: NextRequest): Promise<NextResponse> {
 
       const result = await controller.createTransaction(input);
       if (!result.success) {
+        console.error('[MIT App Inventor] Create validation error:', result.error, 'Body:', JSON.stringify(body));
         return errorResponse(result.error, { status: 400 });
       }
 
@@ -142,6 +151,7 @@ async function handleRequest(request: NextRequest): Promise<NextResponse> {
 
       const result = await controller.updateTransaction(parsedId!, input);
       if (!result.success) {
+        console.error('[MIT App Inventor] Update validation error:', result.error, 'Body:', JSON.stringify(body));
         return notFoundResponse(result.error);
       }
 
@@ -159,6 +169,18 @@ async function handleRequest(request: NextRequest): Promise<NextResponse> {
       return successResponse(null, {
         message: 'Transaction deleted successfully',
       });
+    }
+
+    case 'history': {
+      if (!dateFrom || !dateTo) {
+        return badRequestResponse('date_from and date_to query params are required (YYYY-MM-DD)');
+      }
+
+      const result = await controller.getHistory(parsedPocketId, dateFrom, dateTo);
+      if (!result.success) {
+        return errorResponse(result.error, { status: 500 });
+      }
+      return successResponse(result.data, { total: result.total });
     }
   }
 }

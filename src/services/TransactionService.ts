@@ -6,22 +6,20 @@ export class TransactionService {
 
   async create(input: CreateTransactionInput): Promise<Transaction> {
     const pool = getPool();
-    const query = `
-      INSERT INTO ${this.tableName} (pocket_id, amount, type, category, description, date)
-      VALUES ($1, $2, $3, $4, $5, $6)
-      RETURNING *
-    `;
-
-    const values = [
+    const values: unknown[] = [
       input.pocketId,
       input.amount,
       input.type,
       input.category ?? null,
       input.description ?? null,
-      input.date ?? null,
+      input.date,
     ];
 
-    const result = await pool.query(query, values);
+    const query = input.date
+      ? `INSERT INTO ${this.tableName} (pocket_id, amount, type, category, description, date) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`
+      : `INSERT INTO ${this.tableName} (pocket_id, amount, type, category, description) VALUES ($1, $2, $3, $4, $5) RETURNING *`;
+
+    const result = await pool.query(query, input.date ? values : values.slice(0, 5));
     return this.mapRowToTransaction(result.rows[0]);
   }
 
@@ -44,6 +42,23 @@ export class TransactionService {
 
     if (pocketId !== undefined) {
       query += ' WHERE pocket_id = $1';
+      values.push(pocketId);
+    }
+
+    query += ' ORDER BY date DESC, created_at DESC';
+
+    const result = await pool.query(query, values);
+    return result.rows.map(row => this.mapRowToTransaction(row));
+  }
+
+  async getByDateRange(pocketId: number | undefined, startDate: string, endDate: string): Promise<Transaction[]> {
+    const pool = getPool();
+    const values: unknown[] = [];
+    let query = `SELECT * FROM ${this.tableName} WHERE date >= $1 AND date <= $2`;
+    values.push(startDate, endDate);
+
+    if (pocketId !== undefined) {
+      query += ` AND pocket_id = $${values.length + 1}`;
       values.push(pocketId);
     }
 

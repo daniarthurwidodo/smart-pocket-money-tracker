@@ -153,6 +153,23 @@ export class MITAppInventorController {
     }
   }
 
+  async getHistory(pocketId: number | undefined, startDate: string, endDate: string): Promise<ApiListResponse<Transaction>> {
+    try {
+      const transactions = await this.transactionService.getByDateRange(pocketId, startDate, endDate);
+      return {
+        success: true,
+        data: transactions,
+        total: transactions.length,
+      };
+    } catch (error) {
+      console.error('MITAppInventorController.getHistory error:', error);
+      return {
+        success: false,
+        error: 'Failed to fetch transaction history',
+      };
+    }
+  }
+
   private validateCreateInput(input: CreateTransactionInput): string[] {
     const errors: string[] = [];
 

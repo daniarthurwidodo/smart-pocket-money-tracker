@@ -45,52 +45,84 @@ export class OpenRouterClient {
   }
 
   async parsePocketPrompt(userPrompt: string, retryCount: number = 0, useFallback: boolean = false): Promise<ParsePocketPromptResult> {
-    const systemPrompt = `Anda adalah asisten pelacak uang saku. Analisis permintaan pengguna dan ekstrak informasi pocket.
+    const systemPrompt = `Anda adalah asisten pelacak uang saku. Analisis permintaan pengguna dan ekstrak informasi.
 
-**PENTING**:
-- NAMA pocket TIDAK WAJIB (nullable). Pengguna tidak harus memberikan nama.
-- Jika pengguna ingin MENGUPDATE atau MENGHAPUS pocket, ID WAJIB diisi. Jika tidak ada ID, kembalikan null.
-- Ekstrak TANGGAL (target_date) jika pengguna menyebutkan tanggal spesifik.
-- Kembalikan HANYA JSON yang valid. Tanpa teks lain.
+**Actions yang valid**: "create", "update", "delete", "list", "create_transaction"
 
-**Actions yang valid**: "create", "update", "delete", "list"
+---
+**ACTION 1: create_transaction (untuk pencatatan pemasukan/pengeluaran)**
 
-**Format respons untuk permintaan valid**:
+Gunakan ini ketika pengguna ingin mencatat pemasukan atau pengeluaran harian.
+
+Format respons:
 {
-  "action": "create" | "update" | "delete" | "list",
-  "pocket": {
-    "name": string (opsional, bisa null),
-    "balance": number (opsional, default 0),
-    "currency": string (opsional, default "IDR", harus 3 huruf kode ISO),
-    "description": string (opsional, untuk catatan tambahan),
-    "targetDate": string (opsional, format YYYY-MM-DD, jika pengguna menyebutkan tanggal),
-    "isActive": boolean (opsional, default true)
-  },
-  "id": number (WAJIB untuk update/delete)
+  "action": "create_transaction",
+  "transaction": {
+    "pemasukan": number,
+    "pengeluaran": number,
+    "tanggal": "DD-MM-YYYY"
+  }
 }
 
-**Catatan**:
-- Jika pengguna menyebutkan tanggal, ekstrak ke field "targetDate" dengan format YYYY-MM-DD
-- Contoh: "saya ingin menyimpan 5000 tanggal 20 februari 2026" -> targetDate: "2026-02-20"
+Aturan:
+- "pemasukan" = pemasukan/pendapatan/income/tabungan (default 0)
+- "pengeluaran" = pengeluaran/biaya/expense (default 0)
+- "tanggal" WAJIB, format DD-MM-YYYY (tanpa leading zero: 9-4-2026 bukan 09-04-2026)
+- Konversi semua angka teks: "200 ribu" = 200000, "1000" = 1000
+- Jika hanya menyebut angka tunggal → itu pemasukan
+- Jika menyebut "pengeluaran" atau "biaya" → itu pengeluaran
 
-**Kapan mengembalikan null**:
-- Permintaan pengguna tidak jelas atau ambigu
-- Tidak ada ID pocket untuk update/delete
-- Pengguna hanya mengobrol atau bertanya hal di luar manajemen pocket
+Contoh create_transaction:
+- "Pemasukan 100000 pengeluaran 50000 tanggal 15-3-2026" -> {"action":"create_transaction","transaction":{"pemasukan":100000,"pengeluaran":50000,"tanggal":"15-3-2026"}}
+- "Tabungan 233 pengeluaran 11 tanggal 9 April 2026" -> {"action":"create_transaction","transaction":{"pemasukan":233,"pengeluaran":11,"tanggal":"9-4-2026"}}
+- "Catat pemasukan 50000 tanggal 1 mei 2026" -> {"action":"create_transaction","transaction":{"pemasukan":50000,"pengeluaran":0,"tanggal":"1-5-2026"}}
 
-**Contoh**:
-- "Saya ingin menyimpan 5000 tanggal 20 februari 2026" -> {"action": "create", "pocket": {"balance": 5000, "targetDate": "2026-02-20"}}
-- "Buat pocket Tabungan dengan 5000 untuk tanggal 20 februari 2026" -> {"action": "create", "pocket": {"name": "Tabungan", "balance": 5000, "targetDate": "2026-02-20"}}
-- "Buat pocket Hiburan dengan 200 ribu" -> {"action": "create", "pocket": {"name": "Hiburan", "balance": 200000}}
-- "Update pocket 5 jadi 500 ribu" -> {"action": "update", "id": 5, "pocket": {"balance": 500000}}
-- "Hapus pocket 3" -> {"action": "delete", "id": 3}
-- "Tampilkan semua pocket" -> {"action": "list"}
-- "Halo, apa kabar?" -> null (tidak relevan)
+---
+**ACTION 2: create pocket (untuk membuat budget/pocket baru)**
 
-**Tips**:
-- Nama pocket opsional - jika pengguna tidak menyebutkan nama, biarkan null atau tidak ada
-- Fokus pada jumlah (balance) dan tanggal (targetDate) yang disebutkan
-- Dukung semua bahasa termasuk Bahasa Indonesia dan English.`;
+Format respons:
+{
+  "action": "create",
+  "pocket": {
+    "name": string | null,
+    "balance": number,
+    "currency": "IDR",
+    "description": string | null,
+    "targetDate": "YYYY-MM-DD" | null,
+    "isActive": true
+  }
+}
+
+Contoh:
+- "Buat pocket Hiburan dengan 200 ribu" -> {"action":"create","pocket":{"name":"Hiburan","balance":200000}}
+- "Buat tabungan 5000" -> {"action":"create","pocket":{"name":"Tabungan","balance":5000}}
+
+---
+**ACTION 3: update pocket**
+{
+  "action": "update",
+  "id": number,
+  "pocket": {"balance": number, ...}
+}
+
+**ACTION 4: delete pocket**
+{
+  "action": "delete",
+  "id": number
+}
+
+**ACTION 5: list pockets**
+{
+  "action": "list"
+}
+
+---
+**PENTING**:
+- Kembalikan HANYA JSON valid. Tanpa markdown, tanpa teks lain.
+- Jika permintaan tidak relevan dengan semua action di atas, kembalikan null.
+- Untuk pencatatan uang masuk/keluar harian -> Gunakan "create_transaction"
+- Untuk manajemen pocket/budget -> Gunakan "create", "update", "delete", "list"
+- Dukung Bahasa Indonesia dan English.`;
 
     const startTime = Date.now();
     const controller = new AbortController();
@@ -158,7 +190,7 @@ export class OpenRouterClient {
       }
 
       // Validate that action is one of the valid values
-      const validActions = ['create', 'update', 'delete', 'list'];
+      const validActions = ['create', 'update', 'delete', 'list', 'create_transaction'];
       if (!parsed.action || !validActions.includes(parsed.action)) {
         console.log(`Invalid or missing action in parsed response:`, parsed);
         return {
@@ -208,7 +240,7 @@ export class OpenRouterClient {
 }
 
 export interface PocketData {
-  action: 'create' | 'update' | 'delete' | 'list';
+  action: 'create' | 'update' | 'delete' | 'list' | 'create_transaction';
   pocket?: {
     name?: string | null;
     balance?: number;
@@ -216,6 +248,11 @@ export interface PocketData {
     description?: string | null;
     targetDate?: string | null;
     isActive?: boolean;
+  };
+  transaction?: {
+    pemasukan?: number;
+    pengeluaran?: number;
+    tanggal: string;
   };
   id?: number;
 }

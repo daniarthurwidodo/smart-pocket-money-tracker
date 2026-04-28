@@ -4,7 +4,7 @@ const poolConfig: PoolConfig = {
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false },
   max: 20,
-  idleTimeoutMillis: 30000,
+  idleTimeoutMillis: 300000,
   connectionTimeoutMillis: 5000,
 };
 

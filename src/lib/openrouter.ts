@@ -27,8 +27,8 @@ const OPENROUTER_RETRY_DELAY_MS = 2000; // 2 seconds between retries
 const OPENROUTER_MAX_RETRIES = 2; // Retry up to 2 times for slow requests
 
 // Primary and fallback models
-const PRIMARY_MODEL = 'nvidia/nemotron-3-super-120b-a12b:free';
-const FALLBACK_MODEL = 'google/gemini-2.5-flash-lite';
+const PRIMARY_MODEL = 'google/gemini-2.5-flash';
+const FALLBACK_MODEL = 'openai/gpt-4o-mini';
 
 export class OpenRouterClient {
   private readonly baseUrl = 'https://openrouter.ai/api/v1';
@@ -45,7 +45,18 @@ export class OpenRouterClient {
   }
 
   async parsePocketPrompt(userPrompt: string, retryCount: number = 0, useFallback: boolean = false): Promise<ParsePocketPromptResult> {
+    const currentDateISO = new Date().toISOString().split('T')[0];
+    const currentDateFormatted = (() => {
+      const d = new Date();
+      const day = d.getDate();
+      const month = d.getMonth() + 1;
+      const year = d.getFullYear();
+      return `${day}-${month}-${year}`;
+    })();
+
     const systemPrompt = `Anda adalah asisten pelacak uang saku. Analisis permintaan pengguna dan ekstrak informasi.
+
+Tanggal hari ini: ${currentDateISO} (${currentDateFormatted} dalam format DD-MM-YYYY)
 
 **Actions yang valid**: "create", "update", "delete", "list", "create_transaction"
 
@@ -68,6 +79,7 @@ Aturan:
 - "pemasukan" = pemasukan/pendapatan/income/tabungan (default 0)
 - "pengeluaran" = pengeluaran/biaya/expense (default 0)
 - "tanggal" WAJIB, format DD-MM-YYYY (tanpa leading zero: 9-4-2026 bukan 09-04-2026)
+- Gunakan tanggal hari ini (${currentDateFormatted}) jika pengguna menyebut "hari ini", "today", "kini"
 - Konversi semua angka teks: "200 ribu" = 200000, "1000" = 1000
 - Jika hanya menyebut angka tunggal → itu pemasukan
 - Jika menyebut "pengeluaran" atau "biaya" → itu pengeluaran

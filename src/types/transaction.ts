@@ -6,8 +6,8 @@ export interface Transaction {
   category: string | null;
   description: string | null;
   date: string;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface CreateTransactionInput {

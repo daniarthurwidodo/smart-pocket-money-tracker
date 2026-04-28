@@ -125,3 +125,27 @@ export function withErrorHandler(
     return serverErrorResponse(errorMessage);
   });
 }
+
+/**
+ * Retries a handler once if it returns a 500 response.
+ * Useful for serverless databases that may cold-start.
+ */
+export async function withRetry(
+  handler: () => Promise<NextResponse>,
+  retryLogLabel: string = 'handler'
+): Promise<NextResponse> {
+  const first = await handler();
+
+  if (first.status !== 500) {
+    return first;
+  }
+
+  console.warn(`[${retryLogLabel}] First attempt returned 500, retrying once...`);
+  const retry = await handler();
+
+  if (retry.status === 500) {
+    console.error(`[${retryLogLabel}] Retry also returned 500, giving up.`);
+  }
+
+  return retry;
+}

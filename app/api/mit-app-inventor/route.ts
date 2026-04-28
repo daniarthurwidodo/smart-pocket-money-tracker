@@ -4,11 +4,13 @@ import {
   successResponse,
   errorResponse,
   withErrorHandler,
+  withRetry,
   badRequestResponse,
   notFoundResponse,
 } from '../../../src/lib/api-response';
 import { CreateTransactionInput, UpdateTransactionInput } from '../../../src/types/transaction';
 import { handleMITCreate } from '../../../src/lib/mit-transaction';
+import { OpenRouterClient } from '../../../src/lib/openrouter';
 
 const controller = new MITAppInventorController();
 
@@ -95,22 +97,54 @@ async function handleRequest(request: NextRequest): Promise<NextResponse> {
 
     case 'create': {
       const body = await parseBody(request);
-
-      if (!body || typeof body !== 'object') {
-        return badRequestResponse('Request body must be a JSON object');
-      }
+      console.log(`[MIT App Inventor] Create body: ${JSON.stringify(body)}`);
 
       // Handle MIT App Inventor format: { pengeluaran, pemasukan, tanggal }
-      const mitBody = body as Record<string, unknown>;
-      if ('pengeluaran' in mitBody || 'pemasukan' in mitBody || 'tanggal' in mitBody) {
-        const results = await handleMITCreate(body as Record<string, unknown>);
-        if (!results.success) {
-          return errorResponse(results.error, { status: 400 });
+      if (body && typeof body === 'object') {
+        const mitBody = body as Record<string, unknown>;
+        if ('pengeluaran' in mitBody || 'pemasukan' in mitBody || 'tanggal' in mitBody) {
+          const results = await handleMITCreate(body as Record<string, unknown>);
+          if (!results.success) {
+            return errorResponse(results.error, { status: 400 });
+          }
+          return successResponse(results.data, {
+            status: 201,
+            message: 'Transaction created successfully',
+          });
         }
-        return successResponse(results.data, {
-          status: 201,
-          message: 'Transaction created successfully',
-        });
+      }
+
+      // Handle string prompt — route through AI parser
+      if (typeof body === 'string') {
+        const prompt = body;
+        console.log(`[MIT App Inventor] Processing AI prompt: ${prompt}`);
+
+        const openrouter = new OpenRouterClient();
+        const parsed = await openrouter.parsePocketPrompt(prompt);
+        console.log(`[MIT App Inventor] Parsed: ${JSON.stringify(parsed)}`);
+
+        if (!parsed.parsedData) {
+          return errorResponse('Could not parse prompt. Please use format like: "simpan 123 hari ini" or provide JSON.', { status: 400 });
+        }
+
+        // Handle create_transaction action
+        if (parsed.parsedData.action === 'create_transaction' && parsed.parsedData.transaction) {
+          const result = await handleMITCreate({
+            pemasukan: parsed.parsedData.transaction.pemasukan ?? 0,
+            pengeluaran: parsed.parsedData.transaction.pengeluaran ?? 0,
+            tanggal: parsed.parsedData.transaction.tanggal,
+          } as Record<string, unknown>);
+
+          if (!result.success) {
+            return errorResponse(`Failed to create transaction: ${result.error}`, { status: 400 });
+          }
+          return successResponse(result.data, {
+            status: 201,
+            message: 'Transaction created successfully via AI',
+          });
+        }
+
+        return errorResponse(`Unsupported AI action: ${parsed.parsedData.action}. Use this endpoint for create_transaction only.`, { status: 400 });
       }
 
       const input: CreateTransactionInput = {
@@ -172,10 +206,6 @@ async function handleRequest(request: NextRequest): Promise<NextResponse> {
     }
 
     case 'history': {
-      if (!dateFrom || !dateTo) {
-        return badRequestResponse('date_from and date_to query params are required (YYYY-MM-DD)');
-      }
-
       const result = await controller.getHistory(parsedPocketId, dateFrom, dateTo);
       if (!result.success) {
         return errorResponse(result.error, { status: 500 });
@@ -186,7 +216,10 @@ async function handleRequest(request: NextRequest): Promise<NextResponse> {
 }
 
 export async function GET(request: NextRequest) {
-  return withErrorHandler(() => handleRequest(request), 'MIT App Inventor GET error');
+  return withRetry(
+    () => withErrorHandler(() => handleRequest(request), 'MIT App Inventor GET error'),
+    'MIT App Inventor GET'
+  );
 }
 
 export async function POST(request: NextRequest) {

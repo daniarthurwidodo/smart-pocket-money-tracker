@@ -51,20 +51,34 @@ export class TransactionService {
     return result.rows.map(row => this.mapRowToTransaction(row));
   }
 
-  async getByDateRange(pocketId: number | undefined, startDate: string, endDate: string): Promise<Transaction[]> {
+  async getByDateRange(pocketId: number | undefined, startDate?: string, endDate?: string): Promise<Transaction[]> {
     const pool = getPool();
     const values: unknown[] = [];
-    let query = `SELECT * FROM ${this.tableName} WHERE date >= $1 AND date <= $2`;
-    values.push(startDate, endDate);
+    let query = `SELECT * FROM ${this.tableName}`;
 
-    if (pocketId !== undefined) {
-      query += ` AND pocket_id = $${values.length + 1}`;
+    if (startDate && endDate) {
+      const conditions: string[] = [];
+      conditions.push(`date >= $${values.length + 1} AND date <= $${values.length + 2}`);
+      values.push(startDate, endDate);
+
+      if (pocketId !== undefined) {
+        conditions.push(`pocket_id = $${values.length + 1}`);
+        values.push(pocketId);
+      }
+
+      query += ' WHERE ' + conditions.join(' AND ');
+    } else if (pocketId !== undefined) {
+      query += ` WHERE pocket_id = $1`;
       values.push(pocketId);
     }
 
     query += ' ORDER BY date DESC, created_at DESC';
 
+    const startTime = Date.now();
     const result = await pool.query(query, values);
+    console.log(`[TransactionService] Query took ${Date.now() - startTime}ms, rows: ${result.rows.length}`);
+    console.log(`[TransactionService] Values: ${JSON.stringify(values)}`);
+    console.log(`[TransactionService] Results: ${JSON.stringify(result.rows)}`);
     return result.rows.map(row => this.mapRowToTransaction(row));
   }
 
@@ -132,6 +146,9 @@ export class TransactionService {
   }
 
   private mapRowToTransaction(row: Record<string, unknown>): Transaction {
+    const createdAt = row.created_at as Date;
+    const updatedAt = row.updated_at as Date;
+
     return {
       id: row.id as number,
       pocketId: row.pocket_id as number,
@@ -140,8 +157,21 @@ export class TransactionService {
       category: row.category as string | null,
       description: row.description as string | null,
       date: row.date as string,
-      createdAt: row.created_at as Date,
-      updatedAt: row.updated_at as Date,
+      createdAt: this.toReadableDate(createdAt),
+      updatedAt: this.toReadableDate(updatedAt),
     };
+  }
+
+  private toReadableDate(date: Date | string): string {
+    const d = date instanceof Date ? date : new Date(date);
+    if (isNaN(d.getTime())) return '';
+
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const h = d.getHours();
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    const hour = h % 12 || 12;
+    const min = d.getMinutes().toString().padStart(2, '0');
+
+    return `${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()} ${hour}:${min} ${ampm}`;
   }
 }

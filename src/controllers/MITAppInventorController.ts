@@ -153,7 +153,7 @@ export class MITAppInventorController {
     }
   }
 
-  async getHistory(pocketId: number | undefined, startDate: string, endDate: string): Promise<ApiListResponse<Transaction>> {
+  async getHistory(pocketId: number | undefined, startDate?: string, endDate?: string): Promise<ApiListResponse<Transaction>> {
     try {
       const transactions = await this.transactionService.getByDateRange(pocketId, startDate, endDate);
       return {

@@ -147,6 +147,11 @@ async function handleRequest(request: NextRequest): Promise<NextResponse> {
         return errorResponse(`Unsupported AI action: ${parsed.parsedData.action}. Use this endpoint for create_transaction only.`, { status: 400 });
       }
 
+      // Fall back to standard JSON object parsing
+      if (!body || typeof body !== 'object') {
+        return badRequestResponse('Request body must be a JSON object with pocketId, amount, and type');
+      }
+
       const input: CreateTransactionInput = {
         pocketId: body.pocketId as number,
         amount: body.amount as number,
@@ -206,7 +211,7 @@ async function handleRequest(request: NextRequest): Promise<NextResponse> {
     }
 
     case 'history': {
-      const result = await controller.getHistory(parsedPocketId, dateFrom, dateTo);
+      const result = await controller.getHistory(parsedPocketId, dateFrom ?? undefined, dateTo ?? undefined);
       if (!result.success) {
         return errorResponse(result.error, { status: 500 });
       }
